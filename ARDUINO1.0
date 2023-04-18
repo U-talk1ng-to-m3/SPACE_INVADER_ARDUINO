@@ -1,0 +1,184 @@
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Wire.h>
+
+#define FIRE_BUT 6
+#define RIGHT_BUT 5
+#define LEFT_BUT 4
+
+
+//ucak ayarları
+#define Ucak_genisligi 8
+#define Ucak_uzunlugu 8
+#define Ucak_hareketY_miktari 2
+#define Ucak_X_start 120
+#define Ucak_Y_start 56
+
+
+#define MISSILE_HEIGHT 4
+#define MISSILE_WIDTH 1
+#define MISSILE_SPEED 4
+
+#define ACTIVE 0
+#define DESTROYED 2
+static const unsigned char PROGMEM UzayAraci []={
+  B11111111,
+  B00011000,
+  B00011000,
+  B00111100,
+  B00111100,
+  B00011000,
+  B00011000,
+  B11111111
+};
+
+
+static const unsigned char PROGMEM Uzaycopu []={
+  B11100111,
+  B10100101,
+  B11100111,
+  B00011000,
+  B00010000,
+  B00010000,
+  B10100101,
+  B01100001,
+  B11111111
+  
+};
+static const unsigned char PROGMEM Meteor []={
+  B00011000,
+  B00111100,
+  B01111110,
+  B11111111,
+  B11111111,
+  B01111110,
+  B00111100,
+  B00011000,
+
+};
+static const unsigned char PROGMEM Missileshot []={
+  B1111000
+};
+
+Adafruit_SSD1306 display(128,64,&Wire,-1);
+
+
+
+struct nesneyapisi{
+  signed int x;
+  signed int y;
+  unsigned char durum;
+};
+struct engel_1{
+  nesneyapisi ord;
+};
+struct Ucakyapisi{
+  nesneyapisi ord;
+};
+struct Ucak_devam{
+  int can=3;
+  int mermi=15;
+};
+engel_1 ENGEL;
+
+
+Ucakyapisi Ucak;
+nesneyapisi Missile;
+
+int c=0;
+void setup(){
+  
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  initUcak();
+  
+  pinMode(RIGHT_BUT,INPUT_PULLUP);
+  pinMode(LEFT_BUT,INPUT_PULLUP);
+  pinMode(FIRE_BUT,INPUT_PULLUP);
+}
+void loop(){
+  if(ENGEL.ord.x==128 || ENGEL.ord.durum==DESTROYED)
+      initengel();
+  fizik();
+  Update_Display();    
+  
+  
+}
+void Update_Display(){
+    display.clearDisplay();
+    display.drawBitmap(Ucak.ord.x,Ucak.ord.y,UzayAraci,8,8,WHITE);
+    if(ENGEL.ord.durum==ACTIVE)
+    {
+      display.drawBitmap(ENGEL.ord.x,ENGEL.ord.y,Uzaycopu,8,8,WHITE);
+    }
+    
+    if(Missile.durum==ACTIVE)
+        {
+          display.drawBitmap(Missile.x,Missile.y,Missileshot,4,1,WHITE);
+        }
+    display.display();    
+}
+
+void fizik(){
+  
+  Ucak_kontrol();
+  MISSILE_CONTROL();
+  ENGEL_KONTROL();
+  Carpisma();
+}
+void initUcak(){
+  Ucak.ord.x=Ucak_X_start;
+  Ucak.ord.y=Ucak_Y_start;
+  
+  Missile.durum=DESTROYED;
+}
+
+void Ucak_kontrol(){
+  if((digitalRead(RIGHT_BUT)==0)&Ucak.ord.y+Ucak_genisligi<64)
+        Ucak.ord.y+=Ucak_hareketY_miktari;
+  if((digitalRead(LEFT_BUT)==0)&Ucak.ord.y>0)
+        Ucak.ord.y-=Ucak_hareketY_miktari;
+  if((digitalRead(FIRE_BUT)==0)&(Missile.durum!=ACTIVE))
+      {
+        Missile.y=Ucak.ord.y+4;
+        Missile.x=Ucak_X_start;
+        Missile.durum=ACTIVE;
+      }
+}
+
+void MISSILE_CONTROL(){
+  if(Missile.durum==ACTIVE)
+  {
+    Missile.x-=MISSILE_SPEED;
+    if(Missile.x-4<0)
+        Missile.durum=DESTROYED;
+
+  }
+}
+void initengel(){
+  int a = random(0,65);
+  ENGEL.ord.x=0;
+  ENGEL.ord.y=a;
+  ENGEL.ord.durum=ACTIVE;
+}
+
+void ENGEL_KONTROL(){
+  ENGEL.ord.x+=MISSILE_SPEED/4;
+  
+}
+void Carpisma(){
+      if(ENGEL.ord.durum==ACTIVE)
+      {
+        if(Missile.durum==ACTIVE)
+            {
+              if((ENGEL.ord.x+8>Missile.x) &(ENGEL.ord.x<Missile.x+1) &(ENGEL.ord.y+8>Missile.y)&(ENGEL.ord.y<Missile.y+4) )
+              {
+                ENGEL.ord.durum=DESTROYED;
+                Missile.durum=DESTROYED;
+              }
+            }
+      }
+}
+
+
+    
+
