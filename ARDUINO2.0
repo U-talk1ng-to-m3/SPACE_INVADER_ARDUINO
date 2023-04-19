@@ -1,0 +1,576 @@
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Wire.h>
+
+#define FIRE_BUT 0
+#define RIGHT_BUT 1
+#define LEFT_BUT 2
+
+
+//ucak ayarları
+#define Ucak_genisligi 8
+#define Ucak_uzunlugu 8
+#define Ucak_hareketY_miktari 2
+#define Ucak_X_start 120
+#define Ucak_Y_start 56
+
+
+#define MISSILE_HEIGHT 4
+#define MISSILE_WIDTH 1
+//#define MISSILE_SPEED 4
+int MISSILE_SPEED=5;
+
+#define ACTIVE 0
+#define DESTROYED 2
+int ledarray[]={A0,A1,A2};
+#define buzzer 3
+int A=13;
+int B=12;
+int C=11;
+int D=10;
+int E=9;
+int F=8;
+int G=7;
+int gecikme=30;
+int rakam,sayi=0,onlar,birler;
+int kontrol_kk=5;
+int MENU_KONTROL=0;
+static const unsigned char PROGMEM UzayAraci []={
+  B11111111,
+  B00011000,
+  B00011000,
+  B00111100,
+  B00111100,
+  B00011000,
+  B00011000,
+  B11111111
+};
+
+
+static const unsigned char PROGMEM Uzaycopu []={
+  B11100111,
+  B10100101,
+  B11100111,
+  B00011000,
+  B00010000,
+  B00010000,
+  B10100101,
+  B01100001,
+  B11111111
+  
+};
+static const unsigned char PROGMEM Meteor []={
+  B00011000,
+  B00111100,
+  B01111110,
+  B11111111,
+  B11111111,
+  B01111110,
+  B00111100,
+  B00011000,
+
+};
+static const unsigned char PROGMEM Missileshot []={
+  B1111000
+};
+
+Adafruit_SSD1306 display(128,64,&Wire,-1);
+
+
+
+struct nesneyapisi{
+  signed int x;
+  signed int y;
+  unsigned char durum;
+
+};
+struct engel_1{
+  nesneyapisi ord;
+  int engel_can=2;
+  
+};
+struct Ucakyapisi{
+  nesneyapisi ord;
+  int can=3;
+  int skor=0;
+  int silah=24;
+  int sayac_patlama=0;
+};
+
+engel_1 ENGEL;
+engel_1 ENGEL2;
+engel_1 ENGEL3;
+engel_1 ENGEL4;
+
+
+Ucakyapisi Ucak;
+nesneyapisi Missile;
+
+int c=0;
+void setup(){
+  
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  initUcak();
+  
+  pinMode(RIGHT_BUT,INPUT_PULLUP);
+  pinMode(LEFT_BUT,INPUT_PULLUP);
+  pinMode(FIRE_BUT,INPUT_PULLUP);
+  for(int i=0;i<3;i++)
+  {
+    pinMode(ledarray[i],OUTPUT);
+  }
+  for(int j=4;j<10;j++){
+    pinMode(j,OUTPUT);
+  }
+  pinMode(buzzer,OUTPUT);
+  
+  
+  
+}
+void loop(){
+  if(MENU_KONTROL==1){
+  if(Ucak.can==3)
+  {
+    digitalWrite(ledarray[0],HIGH);
+    digitalWrite(ledarray[1],HIGH);
+    digitalWrite(ledarray[2],HIGH);
+  }
+  if(Ucak.can==2)
+  {
+    digitalWrite(ledarray[0],LOW);
+    digitalWrite(ledarray[1],HIGH);
+    digitalWrite(ledarray[2],HIGH);
+  }
+  if(Ucak.can==1)
+  {
+    digitalWrite(ledarray[0],LOW);
+    digitalWrite(ledarray[1],LOW);
+    digitalWrite(ledarray[2],HIGH);
+  }
+  if(Ucak.can==0)
+  {
+    digitalWrite(ledarray[0],LOW);
+    digitalWrite(ledarray[1],LOW);
+    digitalWrite(ledarray[2],LOW);
+  }
+  if(ENGEL.ord.x==128 || ENGEL.ord.durum==DESTROYED)
+      initengel();  
+  if(ENGEL2.ord.x==128 || ENGEL2.ord.durum==DESTROYED)
+      initengel2();
+  if(ENGEL3.ord.x==128 || ENGEL3.ord.durum==DESTROYED)
+      initengel3();
+  if(ENGEL4.ord.x==128 || ENGEL4.ord.durum==DESTROYED)
+      initengel4();
+  
+  fizik();
+  Update_Display();    
+  if(Ucak.can==0)
+      MENU_KONTROL=0;
+      
+  }
+  else
+    Menu_fonksiyonu();
+
+
+  
+  
+  
+}
+void Update_Display(){
+    display.clearDisplay();
+    display.drawBitmap(Ucak.ord.x,Ucak.ord.y,UzayAraci,8,8,WHITE);
+    if(ENGEL.ord.durum==ACTIVE)
+    {
+      display.drawBitmap(ENGEL.ord.x,ENGEL.ord.y,Uzaycopu,8,8,WHITE);
+    }
+    if(ENGEL2.ord.durum==ACTIVE)
+    {
+      display.drawBitmap(ENGEL2.ord.x,ENGEL2.ord.y,Meteor,8,8,WHITE);
+    }
+    if(ENGEL3.ord.durum==ACTIVE)
+    {
+      display.drawBitmap(ENGEL3.ord.x,ENGEL3.ord.y,Uzaycopu,8,8,WHITE);
+    }
+    if(ENGEL4.ord.durum==ACTIVE)
+    {
+      display.drawBitmap(ENGEL4.ord.x,ENGEL4.ord.y,Meteor,8,8,WHITE);
+    }
+    if(Missile.durum==ACTIVE)
+        {
+          display.drawBitmap(Missile.x,Missile.y,Missileshot,4,1,WHITE);
+        }
+    display.display();    
+}
+
+void fizik(){
+  
+  Ucak_kontrol();
+  MISSILE_CONTROL();
+  ENGEL_KONTROL();
+  ENGEL_KONTROL2();
+  ENGEL_KONTROL3();
+  ENGEL_KONTROL4();
+  Carpisma();
+  Carpisma2();
+  Carpisma3();
+  Carpisma4();
+  Carpismaucak();
+  Carpismaucak2();
+  Carpismaucak3();
+  Carpismaucak4();
+}
+void initUcak(){
+  Ucak.ord.x=Ucak_X_start;
+  Ucak.ord.y=Ucak_Y_start;
+  
+  Missile.durum=DESTROYED;
+}
+
+void Ucak_kontrol(){
+  if((digitalRead(RIGHT_BUT)==0)&Ucak.ord.y+Ucak_genisligi<64)
+        Ucak.ord.y+=Ucak_hareketY_miktari;
+  if((digitalRead(LEFT_BUT)==0)&Ucak.ord.y>0)
+        Ucak.ord.y-=Ucak_hareketY_miktari;
+  if((digitalRead(FIRE_BUT)==0)&(Missile.durum!=ACTIVE)&(Ucak.silah>0))
+      {
+        Missile.y=Ucak.ord.y+4;
+        Missile.x=Ucak_X_start;
+        Missile.durum=ACTIVE;
+        Ucak.silah-=1;
+      }
+}
+
+void MISSILE_CONTROL(){
+  if(Missile.durum==ACTIVE)
+  {
+    
+    Missile.x-=MISSILE_SPEED;
+    if(Missile.x-4<0)
+        Missile.durum=DESTROYED;
+  }
+}
+void initengel(){
+  int a = random(0,65);
+  ENGEL.ord.x=0;
+  ENGEL.ord.y=a;
+  ENGEL.ord.durum=ACTIVE;
+}
+void initengel2(){
+  int a=random(0,65);
+  ENGEL2.ord.x=0;
+  ENGEL2.ord.y=a;
+  ENGEL2.ord.durum=ACTIVE;
+  ENGEL2.engel_can=2; 
+}
+void initengel3(){
+  int a = random(0,65);
+  ENGEL3.ord.x=0;
+  ENGEL3.ord.y=a;
+  ENGEL3.ord.durum=ACTIVE;
+}
+void initengel4(){
+  int a=random(0,65);
+  ENGEL4.ord.x=0;
+  ENGEL4.ord.y=a;
+  ENGEL4.ord.durum=ACTIVE;
+  ENGEL4.engel_can=2; 
+}
+
+void ENGEL_KONTROL(){
+  ENGEL.ord.x+=MISSILE_SPEED/3; 
+}
+void ENGEL_KONTROL2(){
+  ENGEL2.ord.x+=MISSILE_SPEED/3;
+}
+void ENGEL_KONTROL3(){
+  ENGEL3.ord.x+=MISSILE_SPEED/3;
+}
+void ENGEL_KONTROL4(){
+  ENGEL4.ord.x+=MISSILE_SPEED/3;
+}
+void Carpisma(){
+  
+      if(ENGEL.ord.durum==ACTIVE)
+      {
+        if(Missile.durum==ACTIVE)
+            {
+              if((ENGEL.ord.x+8>Missile.x) &(ENGEL.ord.x<Missile.x+1) &(ENGEL.ord.y+8>Missile.y)&(ENGEL.ord.y<Missile.y+4) )
+              {
+                Ucak.skor+=1;
+                ENGEL.ord.durum=DESTROYED;
+                Missile.durum=DESTROYED;
+                Ucak.sayac_patlama+=1;
+                segmentdisplay();
+              }
+            }
+      }
+}
+void Carpisma2(){
+  
+  if(ENGEL2.ord.durum==ACTIVE)
+      {
+       
+        if(Missile.durum==ACTIVE)
+            {
+              if((ENGEL2.ord.x+8>Missile.x) &(ENGEL2.ord.x<Missile.x+1) &(ENGEL2.ord.y+8>Missile.y)&(ENGEL2.ord.y<Missile.y+4) )
+              {
+
+                    ENGEL2.engel_can-=1;
+                    Missile.durum=DESTROYED;
+                    
+                    if(ENGEL2.engel_can==0)
+                        ENGEL2.ord.durum=DESTROYED;
+                        Ucak.skor+=1;
+                        Ucak.sayac_patlama+=1;    
+                        segmentdisplay();              
+                  
+              }
+              
+            }
+      }
+}
+void Carpisma3(){
+  if(ENGEL3.ord.durum==ACTIVE)
+      {
+        if(Missile.durum==ACTIVE)
+            {
+              if((ENGEL3.ord.x+8>Missile.x) &(ENGEL3.ord.x<Missile.x+1) &(ENGEL3.ord.y+8>Missile.y)&(ENGEL3.ord.y<Missile.y+4) )
+              {
+                Ucak.skor+=1;
+                ENGEL3.ord.durum=DESTROYED;
+                Missile.durum=DESTROYED;
+                Ucak.sayac_patlama+=1;
+                segmentdisplay();
+              }
+            }
+      }
+}
+void Carpisma4(){
+ if(ENGEL4.ord.durum==ACTIVE)
+      {
+       
+        if(Missile.durum==ACTIVE)
+            {
+              if((ENGEL4.ord.x+8>Missile.x) &(ENGEL4.ord.x<Missile.x+1) &(ENGEL4.ord.y+8>Missile.y)&(ENGEL4.ord.y<Missile.y+4) )
+              {
+
+                    ENGEL4.engel_can-=1;
+                    Missile.durum=DESTROYED;
+                    
+                    if(ENGEL4.engel_can==0)
+                        ENGEL4.ord.durum=DESTROYED;
+                        Ucak.skor+=1;
+                        Ucak.sayac_patlama+=1;      
+                        segmentdisplay();            
+                  
+              }
+              
+            }
+      }
+}
+void Carpismaucak(){
+    
+    if((ENGEL2.ord.x+8>Ucak.ord.x)&(ENGEL2.ord.x<Ucak.ord.x+8)&(ENGEL2.ord.y+8>Ucak.ord.y)&ENGEL2.ord.y<Ucak.ord.y+8)
+              {
+                ENGEL2.ord.durum=DESTROYED;
+                Ucak.can-=1;
+                tone(buzzer, 10); 
+                   
+                
+                
+              }
+}
+
+void Carpismaucak2(){
+    
+    if((ENGEL.ord.x+8>Ucak.ord.x)&(ENGEL.ord.x<Ucak.ord.x+8)&(ENGEL.ord.y+8>Ucak.ord.y)&ENGEL.ord.y<Ucak.ord.y+8)
+              {
+                ENGEL.ord.durum=DESTROYED;
+                Ucak.can-=1;
+                tone(buzzer, 10); 
+                
+                       
+                
+              }
+}
+void Carpismaucak3(){
+  if((ENGEL3.ord.x+8>Ucak.ord.x)&(ENGEL3.ord.x<Ucak.ord.x+8)&(ENGEL3.ord.y+8>Ucak.ord.y)&ENGEL3.ord.y<Ucak.ord.y+8)
+              {
+                ENGEL3.ord.durum=DESTROYED;
+                Ucak.can-=1;
+                tone(buzzer, 10); 
+                   
+                
+                
+              }
+}
+void Carpismaucak4(){
+  if((ENGEL4.ord.x+8>Ucak.ord.x)&(ENGEL4.ord.x<Ucak.ord.x+8)&(ENGEL4.ord.y+8>Ucak.ord.y)&ENGEL4.ord.y<Ucak.ord.y+8)
+              {
+                ENGEL4.ord.durum=DESTROYED;
+                Ucak.can-=1;
+                tone(buzzer, 10); 
+                   
+                
+                
+              }
+}
+void segmentdisplay(){
+  birler=sayi%10;
+  onlar=(sayi/10)%10;
+  digitalWrite(4,HIGH);
+  digitalWrite(5,LOW);
+  rakam=onlar;
+  rakamyaz(rakam);
+  delay(5);
+  digitalWrite(5,HIGH);
+  digitalWrite(4,LOW);
+  rakam=birler;
+  rakamyaz(rakam);
+  delay(5);
+  if(kontrol_kk==5)
+  {
+    sayi=sayi+1;
+    if(sayi>99)
+      sayi=99;
+    
+    
+      digitalWrite(4,HIGH);
+      digitalWrite(5,LOW);
+      rakam=onlar;
+      rakamyaz(rakam);
+      delay(5);
+
+      digitalWrite(5,HIGH);
+      digitalWrite(4,LOW);
+      rakam=birler;
+      rakamyaz(rakam);
+      delay(5);
+    
+  }
+  
+
+  }
+
+
+void rakamyaz(int rakam){
+  switch(rakam)
+  {
+    case 0:
+        digitalWrite(A,1);
+        digitalWrite(B,1);
+        digitalWrite(C,1);
+        digitalWrite(D,1);
+        digitalWrite(E,1);
+        digitalWrite(F,1);
+        digitalWrite(G,0);
+        break;
+    case 1:
+        digitalWrite(A,0);
+        digitalWrite(B,1);
+        digitalWrite(C,1);
+        digitalWrite(D,0);
+        digitalWrite(E,0);
+        digitalWrite(F,0);
+        digitalWrite(G,0);
+        break;
+    case 2:
+        digitalWrite(A,1);
+        digitalWrite(B,1);
+        digitalWrite(C,0);
+        digitalWrite(D,1);
+        digitalWrite(E,1);
+        digitalWrite(F,0);
+        digitalWrite(G,1);
+        break;
+    case 3:
+        digitalWrite(A,1);
+        digitalWrite(B,1);
+        digitalWrite(C,1);
+        digitalWrite(D,1);
+        digitalWrite(E,0);
+        digitalWrite(F,0);
+        digitalWrite(G,1);
+        break;
+    case 4:
+        digitalWrite(A,0);
+        digitalWrite(B,1);
+        digitalWrite(C,1);
+        digitalWrite(D,0);
+        digitalWrite(E,0);
+        digitalWrite(F,1);
+        digitalWrite(G,1);
+        break;
+    case 5:
+        digitalWrite(A,1);
+        digitalWrite(B,0);
+        digitalWrite(C,1);
+        digitalWrite(D,1);
+        digitalWrite(E,0);
+        digitalWrite(F,1);
+        digitalWrite(G,1);
+        break;
+    case 6:
+        digitalWrite(A,1);
+        digitalWrite(B,0);
+        digitalWrite(C,1);
+        digitalWrite(D,1);
+        digitalWrite(E,1);
+        digitalWrite(F,1);
+        digitalWrite(G,1);
+        break;
+    case 7:
+        digitalWrite(A,1);
+        digitalWrite(B,1);
+        digitalWrite(C,1);
+        digitalWrite(D,0);
+        digitalWrite(E,0);
+        digitalWrite(F,0);
+        digitalWrite(G,0);
+        break;
+    case 8:
+        digitalWrite(A,1);
+        digitalWrite(B,1);
+        digitalWrite(C,1);
+        digitalWrite(D,1);
+        digitalWrite(E,1);
+        digitalWrite(F,1);
+        digitalWrite(G,1);
+        break;
+    case 9:
+        digitalWrite(A,1);
+        digitalWrite(B,1);
+        digitalWrite(C,1);
+        digitalWrite(D,1);
+        digitalWrite(E,0);
+        digitalWrite(F,1);
+        digitalWrite(G,1);
+        break;
+  }
+}
+void Menu_fonksiyonu(){
+  display.clearDisplay();
+  
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(64, 16);
+  display.println("Kolay icin sol butona basiniz");
+  display.println("Zor icin sag butona basiniz");
+  display.display();
+  
+  if(digitalRead(RIGHT_BUT)==0)
+  {
+    MENU_KONTROL=1;
+    
+  }
+  if(digitalRead(LEFT_BUT)==0)
+  {
+    
+    MENU_KONTROL=1;
+    MISSILE_SPEED=6;
+  }
+
+  
+}
+
+  
